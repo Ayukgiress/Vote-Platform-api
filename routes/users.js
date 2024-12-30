@@ -4,8 +4,8 @@ import User from '../models/user.js';
 import dotenv from 'dotenv';
 import registerValidator from '../utils/registerValidator.js';
 import loginValidator from '../utils/loginValidator.js';
-import auth from '../middleWare/auth.js';
-import { uploadToCloudService } from '../cloudService.js';
+import auth from '../middleware/auth.js';
+import { uploadToCloudService } from '../CloudService.js';
 import multer from 'multer';
 import crypto from 'crypto';
 import bcrypt from 'bcryptjs';
@@ -15,21 +15,23 @@ import passport from 'passport';
 dotenv.config();
 const router = express.Router();
 
+// Setup Nodemailer transport
 const transporter = nodemailer.createTransport({
   service: 'gmail',
   auth: {
     user: process.env.EMAIL_USER,
     pass: process.env.EMAIL_PASS,
-  }   
+  },
 });
 
+// Setup Multer for image uploads
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
     cb(null, 'uploads/');
   },
   filename: (req, file, cb) => {
     cb(null, Date.now() + '-' + file.originalname);
-  }
+  },
 });
 
 const fileFilter = (req, file, cb) => {
@@ -44,9 +46,10 @@ const fileFilter = (req, file, cb) => {
 const upload = multer({
   storage,
   limits: { fileSize: 5 * 1024 * 1024 },
-  fileFilter
+  fileFilter,
 });
 
+// Register User Route
 router.post('/register', registerValidator, async (req, res) => {
   const { username, email, password } = req.body;
 
@@ -69,14 +72,14 @@ router.post('/register', registerValidator, async (req, res) => {
 
     await user.save();
 
-    const verificationUrl = `${process.env.FRONTEND_URL}/verify-email/${verificationToken}`;
+    const verificationUrl = `http://localhost:5173/verify-email/${verificationToken}`;
 
     await transporter.sendMail({
       to: user.email,
       subject: 'Email Verification',
       html: `<h2>Email Verification</h2>
              <p>Please click the link below to verify your email:</p>
-             <p><a href="${verificationUrl}">Verify Email</a></p>`
+             <p><a href="${verificationUrl}">Verify Email</a></p>`,
     });
 
     res.status(201).json({
@@ -88,6 +91,7 @@ router.post('/register', registerValidator, async (req, res) => {
   }
 });
 
+// Email Verification Route
 router.post('/verify-email/:token', async (req, res) => {
   try {
     const { token } = req.params;
@@ -126,6 +130,7 @@ router.post('/verify-email/:token', async (req, res) => {
   }
 });
 
+// Resend Verification Email
 router.post('/resend-verification-code', async (req, res) => {
   const { email } = req.body;
 
@@ -145,14 +150,14 @@ router.post('/resend-verification-code', async (req, res) => {
     user.verificationTokenExpires = verificationTokenExpires;
     await user.save();
 
-    const verificationUrl = `${process.env.FRONTEND_URL}/verify-email/${verificationToken}`;
+    const verificationUrl = `http://localhost:5173/verify-email/${verificationToken}`;
 
     await transporter.sendMail({
       to: user.email,
       subject: 'Email Verification',
       html: `<h2>Email Verification</h2>
              <p>Please click the link below to verify your email:</p>
-             <p><a href="${verificationUrl}">Verify Email</a></p>`
+             <p><a href="${verificationUrl}">Verify Email</a></p>`,
     });
 
     res.json({ message: 'New verification email sent successfully' });
@@ -162,15 +167,18 @@ router.post('/resend-verification-code', async (req, res) => {
   }
 });
 
+// Login Route
 router.post('/login', loginValidator, async (req, res, next) => {
   const { email, password } = req.body;
 
   try {
+    // Find user by email
     const user = await User.findOne({ email });
     if (!user) {
       return res.status(400).json({ msg: 'Invalid email or password' });
     }
 
+    // Check if password matches
     const isMatch = await user.matchPassword(password);
     if (!isMatch) {
       return res.status(400).json({ msg: 'Invalid email or password' });
@@ -185,9 +193,12 @@ router.post('/login', loginValidator, async (req, res, next) => {
 
     res.json({ accessToken, refreshToken });
   } catch (err) {
-    next(err);
+    console.error("Login error:", err);
+    next(err); 
   }
 });
+
+
 
 router.post('/refresh-token', async (req, res) => {
   const { refreshToken } = req.body;
@@ -215,7 +226,7 @@ router.post('/refresh-token', async (req, res) => {
   }
 });
 
-router.get("/current-user", auth, async (req, res) => {
+router.get('/current-user', auth, async (req, res) => {
   try {
     const user = await User.findById(req.user.id)
       .select('-password')
@@ -225,39 +236,60 @@ router.get("/current-user", auth, async (req, res) => {
     }
     return res.status(200).json(user);
   } catch (error) {
-    console.error("Error fetching current user:", error);
+    console.error('Error fetching current user:', error);
     return res.status(500).json({ error: 'Internal server error' });
   }
 });
 
-router.get("/profile", auth, async (req, res, next) => {
+router.get('/auth/google', passport.authenticate('google', {
+  scope: ['profile', 'email'],
+}));
+
+router.get('/google/callback', passport.authenticate('google', {
+  session: false,
+  failureRedirect: '/login',
+}), async (req, res) => {
   try {
-    const user = await User.findById(req.user.id).select("-password");
+    console.log('Google OAuth Callback - User:', req.user);
+
+    if (!req.user) {
+      console.error('No user found in the request');
+      return res.status(401).json({
+        status: 'failed',
+        message: 'Google authentication failed',
+      });
+    }
+
+    const token = jwt.sign(
+      { user: { id: req.user._id.toString(), email: req.user.email } },
+      process.env.JWT_SECRET,
+      { expiresIn: '7d' }
+    );
+
+    const frontendRedirectURL = `${process.env.FRONTEND_URL}/oauth-callback?token=${token}`;
+
+    console.log('Redirect URL:', frontendRedirectURL);
+    res.redirect(frontendRedirectURL);
+  } catch (error) {
+    console.error('Google OAuth Callback Error:', error);
+    res.status(500).json({ status: 'failed', message: 'Internal server error' });
+  }
+});
+
+router.get('/profile', auth, async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id).select('email');
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
     }
-    res.json(user);
+    res.json(user); 
   } catch (error) {
-    next(error);
+    res.status(500).json({ error: 'Server error' });
   }
 });
 
-router.put('/profile', auth, async (req, res, next) => {
-  const { username, email, profileImage } = req.body;
 
-  try {
-    const updatedUser = await User.findByIdAndUpdate(
-      req.user.id,
-      { username, email, profileImage },
-      { new: true, runValidators: true }
-    ).select('-password');
-
-    res.json(updatedUser);
-  } catch (error) {
-    next(error);
-  }
-});
-
+// Profile Image Upload Route
 router.post('/uploadProfileImage', auth, upload.single('file'), async (req, res, next) => {
   try {
     if (!req.file) {
@@ -286,69 +318,12 @@ router.post('/uploadProfileImage', auth, upload.single('file'), async (req, res,
   }
 });
 
-router.get('/auth/google',
-  passport.authenticate('google', {
-    scope: ['profile', 'email'],
-  })
-);
-router.get(
-  "/google/callback",
-  passport.authenticate("google", {
-    session: false,
-    failureRedirect: "/login",
-  }),
-  async (req, res) => {
-    try {
-      console.log('Google OAuth Callback - User:', req.user);
-
-      if (!req.user) {
-        console.error('No user found in the request');
-        return res.status(401).json({
-          status: "failed",
-          message: "Google authentication failed",
-        });
-      }
-
-      const token = jwt.sign(
-        {
-          user: {
-            id: req.user._id.toString(),
-            email: req.user.email
-          }
-        },
-        process.env.JWT_SECRET,
-        { expiresIn: '7d' }
-      );
-
-      const frontendRedirectURL = `https://fittrack-web.vercel.app/oauth-callback?token=${token}`;
-
-      console.log('Redirect URL:', frontendRedirectURL);
-      res.redirect(frontendRedirectURL);
-    } catch (error) {
-      console.error("Google OAuth Callback Error:", error);
-      res.status(500).json({
-        status: "failed",
-        message: "Internal server error",
-      });
-    }
-  }
-);
-
-// router.get('/validate-token', authenticateJWT, (req, res) => {
-//   try {
-//     console.log('User validated:', req.user);
-//     res.json({
-//       status: 'success',
-//       user: {
-//         id: req.user.id,
-//         username: req.user.username,
-//         email: req.user.email
-//       }
-//     });
-//   } catch (error) {
-//     console.error('Token validation error:', error);
-//     res.status(401).json({ status: 'failed', message: 'Invalid token' });
-//   }
-// });
+// Global Error Handler
+router.use((err, req, res, next) => {
+  console.error('Error:', err.message);
+  res.status(err.status || 500).json({
+    message: err.message || 'An unexpected error occurred',
+  });
+});
 
 export default router;
