@@ -1,15 +1,27 @@
 import express from 'express';
 const router = express.Router();
 import Contest from '../models/contest.js';
-import upload from '../middleware/upload.js';
+import multer from 'multer'; 
+import Contestant from '../models/contestants.js';
+import uploadMiddleware from '../middleware/upload.js'; 
+import path from 'path'
 
-// Configure multer to accept multiple files with specific field names
-const contestUpload = upload.fields([
-  { name: 'coverPhoto', maxCount: 1 }, // Name should be 'coverPhoto'
+const contestUpload = uploadMiddleware.fields([
+  { name: 'coverPhoto', maxCount: 1 }, 
   { name: 'contestants', maxCount: 10 }
 ]);
 
-// POST endpoint to create a contest
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, 'uploads/');
+  },
+  filename: (req, file, cb) => {
+    cb(null, Date.now() + path.extname(file.originalname));
+  },
+});
+
+const upload = multer({ storage });
+
 router.post('/', contestUpload, async (req, res) => {
   try {
     console.log('Files received:', req.files);
@@ -31,14 +43,39 @@ router.post('/', contestUpload, async (req, res) => {
       });
     }
 
-    const { name, description, startDate, endDate, contestants } = req.body;
+    router.patch("/contests/:contestId/publish", authenticate, async (req, res) => {
+      const { contestId } = req.params;
+      const { isPublished } = req.body; 
+    
+      try {
+        const contest = await Contest.findById(contestId);
+    
+        if (!contest) {
+          return res.status(404).json({ error: "Contest not found" });
+        }
+    
+        if (contest.userId.toString() !== req.user._id.toString()) {
+          return res.status(403).json({ error: "You do not have permission to modify this contest" });
+        }
+    
+        contest.isPublished = isPublished;
+        await contest.save();
+    
+        res.json({ success: true, message: isPublished ? "Contest published!" : "Contest unpublished", data: contest });
+      } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: "Failed to update contest publish status" });
+      }
+    });
+    
 
-    // Validate required fields
-    if (!name || !description || !startDate || !endDate) {
+    const { name, description, startDate, endDate, contestants, userId } = req.body;
+
+    if (!name || !description || !startDate || !endDate || !userId) {
       return res.status(400).json({
         success: false,
         error: 'Missing required fields',
-        received: { name, description, startDate, endDate }
+        received: { name, description, startDate, endDate, userId }
       });
     }
 
@@ -55,16 +92,14 @@ router.post('/', contestUpload, async (req, res) => {
 
     const coverPhotoUrl = req.files.coverPhoto[0].path;
     const contestantPhotos = req.files.contestants || [];
-    // ... rest of your code
 
-    // Map contestants to include their photos
     const contestantsWithPhotos = parsedContestants.map((contestant, index) => ({
       name: contestant.name,
-      photoUrl: contestantPhotos[index] ? contestantPhotos[index].path : '' // Photo path for each contestant
+      photoUrl: contestantPhotos[index] ? contestantPhotos[index].path : '' 
     }));
 
-    // Create the contest document
     const contest = new Contest({
+      userId,
       name,
       description,
       coverPhotoUrl,
@@ -73,10 +108,8 @@ router.post('/', contestUpload, async (req, res) => {
       contestants: contestantsWithPhotos
     });
 
-    // Save the contest to the database
     await contest.save();
 
-    // Return the created contest as a response
     res.status(201).json({
       success: true,
       data: contest
@@ -90,7 +123,31 @@ router.post('/', contestUpload, async (req, res) => {
   }
 });
 
-// Route to get all contests
+router.post('/:contestId/contestants', upload.single('photo'), async (req, res) => {
+  try {
+    const { name } = req.body;
+    const photoUrl = req.file ? `/uploads/${req.file.filename}` : null;
+    const newContestant = new Contestant({
+      name,
+      photoUrl,
+      contestId: req.params.contestId,
+    });
+
+    await newContestant.save();
+
+    res.status(201).json({
+      success: true,
+      data: {
+        name: newContestant.name,
+        photoUrl: newContestant.photoUrl,  
+      },
+    });
+  } catch (error) {
+    console.error('Error adding contestant:', error);
+    res.status(500).json({ error: 'Failed to add contestant' });
+  }
+});
+
 router.get('/', async (req, res) => {
   try {
     const contests = await Contest.find().sort({ createdAt: -1 });
@@ -107,25 +164,21 @@ router.get('/', async (req, res) => {
   }
 });
 
-// Route to get a specific contest by ID
-router.get('/:id', async (req, res) => {
+
+router.get('/:userId', async (req, res) => {
   try {
-    const contest = await Contest.findById(req.params.id);
-    if (!contest) {
-      return res.status(404).json({
-        success: false,
-        error: 'Contest not found'
-      });
-    }
+    const contests = await Contest.find({ userId: req.params.userId })
+      .sort({ createdAt: -1 });
+      
     res.json({
       success: true,
-      data: contest
+      data: contests
     });
   } catch (error) {
-    console.error('Error fetching contest:', error);
+    console.error('Error fetching contests:', error);
     res.status(500).json({
       success: false,
-      error: 'Error fetching contest'
+      error: 'Error fetching contests'
     });
   }
 });

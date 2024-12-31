@@ -36,7 +36,7 @@ app.use(express.static(path.join(path.resolve(), 'public')));
 
 app.use(cors({
   origin: 'http://localhost:5173', 
-  methods: ['GET', 'POST', "DELETE", "PUT"],
+  methods: ['GET', 'POST', "DELETE", "PUT", "PATCH"],
   credentials: true
 }));
 
