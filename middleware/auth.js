@@ -3,24 +3,20 @@ import User from "../models/user.js";
 
 const auth = async (req, res, next) => {
   const token = req.header("Authorization")?.replace("Bearer ", "");
-  
+
   if (!token) {
-    return res.status(401).json({ error: "Authentication required" });
+    return res.status(401).json({ error: "Authentication required", details: "No token provided" });
   }
 
-  console.log("Received Token:", token);
+  console.log("Received Token:", token); 
 
   try {
-    // Decode the token to verify it
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-
-    // Fetch user based on the decoded token
     const user = await User.findById(decoded.user.id);
     if (!user) {
       return res.status(401).json({ error: "User not found" });
     }
 
-    // Remove password from user object
     const { password, ...restUser } = user.toObject();
     req.user = { ...restUser, id: restUser._id };
 
@@ -30,5 +26,6 @@ const auth = async (req, res, next) => {
     return res.status(401).json({ error: "Invalid token", details: err.message });
   }
 };
+
 
 export default auth;

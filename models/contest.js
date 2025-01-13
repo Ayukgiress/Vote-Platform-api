@@ -1,18 +1,26 @@
 import mongoose from "mongoose";
 
-// Contestant Schema
-const contestantSchema = new mongoose.Schema({
-  name: {
-    type: String,
-    required: true,
-  },
-  photoUrl: {
-    type: String,
-    required: true,
-  },
-});
 
-// Contest Schema
+// const contestantSchema = new mongoose.Schema({
+//   name: {
+//     type: String,
+//     required: true
+//   },
+//   photoUrl: {
+//     type: String,
+//     required: true
+//   },
+//   contestId: {
+//     type: mongoose.Schema.Types.ObjectId,
+//     ref: 'Contest',
+//     required: true
+//   },
+//   votes: {
+//     type: Number,
+//     default: 0
+//   }
+// });
+
 const contestSchema = new mongoose.Schema({
   userId: {
     type: mongoose.Schema.Types.ObjectId,  
@@ -43,11 +51,20 @@ const contestSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: "Contestant",  
   }],
+  isPublished: {
+    type: Boolean,
+    default: false,  
+  },
   createdAt: {
     type: Date,
     default: Date.now,
-  },
+  }
 });
+
+contestSchema.methods.isActive = function() {
+  const now = new Date();
+  return this.isPublished && now >= this.startDate && now <= this.endDate;
+};
 
 const Contest = mongoose.model("Contest", contestSchema);
 export default Contest;

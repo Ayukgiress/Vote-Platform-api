@@ -9,7 +9,6 @@ const UserSchema = new Schema({
     type: String,
     required: true
   },
-
   email: {
     type: String,
     unique: true,
@@ -17,11 +16,7 @@ const UserSchema = new Schema({
   },
   password: {
     type: String,
-    required: function () { return this.googleId ? false : true; }
-  },
-  googleId: {
-    type: String,
-    unique: true
+    required: true
   },
   isVerified: {
     type: Boolean,
@@ -52,8 +47,7 @@ const UserSchema = new Schema({
   timestamps: true
 });
 
-
-UserSchema.pre('save', async function (next) {
+UserSchema.pre('save', async function(next) {
   if (!this.isModified('password')) return next();
 
   try {
@@ -65,20 +59,18 @@ UserSchema.pre('save', async function (next) {
   }
 });
 
-UserSchema.methods.isVerificationCodeValid = function () {
+UserSchema.methods.isVerificationCodeValid = function() {
   return Date.now() < this.verificationTokenExpires;
 };
 
-
-UserSchema.methods.matchPassword = async function (enteredPassword) {
-  if (!this.password) return false;
+UserSchema.methods.matchPassword = async function(enteredPassword) {
   return await bcrypt.compare(enteredPassword, this.password);
 };
 
-UserSchema.methods.generateResetPasswordToken = function () {
+UserSchema.methods.generateResetPasswordToken = function() {
   const resetToken = crypto.randomBytes(20).toString('hex');
   this.resetPasswordToken = resetToken;
-  this.resetPasswordExpires = Date.now() + 3600000;
+  this.resetPasswordExpires = Date.now() + 3600000; 
   return resetToken;
 };
 
