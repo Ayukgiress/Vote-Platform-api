@@ -8,19 +8,16 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import fs from 'fs';
 
-// Get the current directory path in ES modules
+
 const __dirname = path.dirname(new URL(import.meta.url).pathname);
 
-// Initialize the app
 const app = express();
 
-// Directory setup for uploads
 const uploadsDir = path.join(process.cwd(), 'uploads');
 if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir, { recursive: true });
 }
 
-// Use __dirname to serve static files
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 dotenv.config();   
@@ -46,9 +43,11 @@ app.get('/', (req, res) => {
 
 import usersRouter from './routes/users.js';  
 import contestRouter from './routes/contests.js';
+// import voteRoute from './routes/vote.js'
 
 app.use('/users', usersRouter); 
 app.use('/contests', contestRouter);
+// app.use('./vote',  voteRoute)
 
 connectDB();
 

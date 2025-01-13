@@ -15,7 +15,6 @@ import passport from "passport";
 dotenv.config();
 const router = express.Router();
 
-// Setup Nodemailer transport
 const transporter = nodemailer.createTransport({
   service: "gmail",
   auth: {
@@ -24,7 +23,6 @@ const transporter = nodemailer.createTransport({
   },
 });
 
-// Setup Multer for image uploads
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
     cb(null, "uploads/");
@@ -54,7 +52,6 @@ const upload = multer({
   fileFilter,
 });
 
-// Register User Route
 router.post("/register", registerValidator, async (req, res) => {
   const { username, email, password } = req.body;
 
@@ -96,48 +93,7 @@ router.post("/register", registerValidator, async (req, res) => {
   }
 });
 
-// Email Verification Route
-router.post("/verify-email/:token", async (req, res) => {
-  try {
-    const { token } = req.params;
 
-    const user = await User.findOne({
-      verificationToken: token,
-      verificationTokenExpires: { $gt: Date.now() },
-    });
-
-    if (!user) {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid or expired verification token.",
-      });
-    }
-
-    user.isVerified = true;
-    user.verificationToken = undefined;
-    user.verificationTokenExpires = undefined;
-    await user.save();
-
-    const payload = { user: { id: user.id } };
-    const jwtToken = jwt.sign(payload, process.env.JWT_SECRET, {
-      expiresIn: "7d",
-    });
-
-    res.status(200).json({
-      success: true,
-      message: "Email verified successfully!",
-      token: jwtToken,
-    });
-  } catch (error) {
-    console.error("Verification error:", error);
-    res.status(500).json({
-      success: false,
-      message: error.message || "An error occurred during verification.",
-    });
-  }
-});
-
-// Resend Verification Email
 router.post("/resend-verification-code", async (req, res) => {
   const { email } = req.body;
 
@@ -174,18 +130,15 @@ router.post("/resend-verification-code", async (req, res) => {
   }
 });
 
-// Login Route
 router.post("/login", loginValidator, async (req, res, next) => {
   const { email, password } = req.body;
 
   try {
-    // Find user by email
     const user = await User.findOne({ email });
     if (!user) {
       return res.status(400).json({ msg: "Invalid email or password" });
     }
 
-    // Check if password matches
     const isMatch = await user.matchPassword(password);
     if (!isMatch) {
       return res.status(400).json({ msg: "Invalid email or password" });
@@ -306,6 +259,8 @@ router.get("/profile", auth, async (req, res) => {
     res.status(500).json({ error: "Server error" });
   }
 });
+
+
 
 router.post(
   "/uploadProfileImage",
