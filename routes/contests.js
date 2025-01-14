@@ -73,6 +73,73 @@ router.post("/", auth, upload.single('coverPhoto'), async (req, res) => {
   }
 });
 
+
+router.get("/all", async (req, res) => {
+  try {
+    const contests = await Contest.find()
+      .populate('contestants')
+      .sort({ createdAt: -1 });
+      
+    res.json({
+      success: true,
+      data: contests,
+    });
+  } catch (error) {
+    console.error("Error fetching all contests:", error);
+    res.status(500).json({
+      success: false,
+      error: "Error fetching contests",
+    });
+  }
+});
+
+
+
+router.post("/:contestId/contestants", contestUpload, async (req, res) => {
+  try {
+    const { contestId } = req.params;
+    const { contestants } = req.body;
+    
+    const contestantPhotos = req.files.contestants || [];
+
+    if (!contestants || !Array.isArray(contestants)) {
+      return res.status(400).json({ 
+        success: false, 
+        error: "Contestants should be an array" 
+      });
+    }
+
+    const contest = await Contest.findById(contestId);
+    if (!contest) {
+      return res.status(404).json({ 
+        success: false, 
+        error: "Contest not found" 
+      });
+    }
+
+    const contestantsWithPhotos = contestants.map((contestant, index) => ({
+      name: contestant,
+      photoUrl: contestantPhotos[index] ? contestantPhotos[index].path : "",
+      contestId: contestId
+    }));
+
+    const newContestants = await Contestant.insertMany(contestantsWithPhotos);
+    contest.contestants.push(...newContestants.map(c => c._id));
+    await contest.save();
+
+    res.status(200).json({
+      success: true,
+      data: contest,
+    });
+  } catch (error) {
+    console.error("Error adding contestants:", error);
+    res.status(500).json({
+      success: false,
+      error: "Error adding contestants to contest",
+    });
+  }
+});
+
 router.patch("/:contestId/publish", auth, async (req, res) => {
   const { contestId } = req.params;
   const { isPublished } = req.body;
@@ -122,51 +189,6 @@ router.patch("/:contestId/publish", auth, async (req, res) => {
 });
 
 
-router.post("/:contestId/contestants", contestUpload, async (req, res) => {
-  try {
-    const { contestId } = req.params;
-    const { contestants } = req.body;
-    
-    const contestantPhotos = req.files.contestants || [];
-
-    if (!contestants || !Array.isArray(contestants)) {
-      return res.status(400).json({ 
-        success: false, 
-        error: "Contestants should be an array" 
-      });
-    }
-
-    const contest = await Contest.findById(contestId);
-    if (!contest) {
-      return res.status(404).json({ 
-        success: false, 
-        error: "Contest not found" 
-      });
-    }
-
-    const contestantsWithPhotos = contestants.map((contestant, index) => ({
-      name: contestant,
-      photoUrl: contestantPhotos[index] ? contestantPhotos[index].path : "",
-      contestId: contestId
-    }));
-
-    const newContestants = await Contestant.insertMany(contestantsWithPhotos);
-    contest.contestants.push(...newContestants.map(c => c._id));
-    await contest.save();
-
-    res.status(200).json({
-      success: true,
-      data: contest,
-    });
-  } catch (error) {
-    console.error("Error adding contestants:", error);
-    res.status(500).json({
-      success: false,
-      error: "Error adding contestants to contest",
-    });
-  }
-});
-
 router.get("/published", async (req, res) => {
   try {
     const contests = await Contest.find({ isPublished: true })
@@ -186,24 +208,7 @@ router.get("/published", async (req, res) => {
   }
 });
 
-router.get("/all", async (req, res) => {
-  try {
-    const contests = await Contest.find()
-      .populate('contestants')
-      .sort({ createdAt: -1 });
-      
-    res.json({
-      success: true,
-      data: contests,
-    });
-  } catch (error) {
-    console.error("Error fetching all contests:", error);
-    res.status(500).json({
-      success: false,
-      error: "Error fetching contests",
-    });
-  }
-});
+
 
 router.get('/:contestId', async (req, res) => {
   try {
@@ -376,7 +381,6 @@ router.post("/:contestId/vote", async (req, res) => {
 
 
 
-//public viewing for contests
 router.get("/view/:contestId", async (req, res) => {
   try {
     const contest = await Contest.findById(req.params.contestId)
@@ -400,7 +404,6 @@ router.post("/:contestId/vote/:contestantId", async (req, res) => {
   try {
     const { contestId, contestantId } = req.params;
 
-    // Update contestant votes
     const contest = await Contest.findOneAndUpdate(
       {
         _id: contestId,
