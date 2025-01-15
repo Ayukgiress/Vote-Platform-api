@@ -224,6 +224,8 @@ router.patch("/:contestId/publish", auth, async (req, res) => {
 });
 
 
+
+
 router.get("/published", async (req, res) => {
   try {
     const contests = await Contest.find({ isPublished: true })
@@ -331,10 +333,11 @@ router.get("/:contestId/contestants", async (req, res) => {
 
 
 
-router.post("/:contestId/vote", auth, async (req, res) => {
+router.post("/:contestId/vote", async (req, res) => {
   const { contestId } = req.params;
   const { contestantId } = req.body;
-  const voterId = req.user._id;
+
+  const voterId = req.ip 
 
   try {
     if (!mongoose.Types.ObjectId.isValid(contestId) || 
@@ -380,6 +383,7 @@ router.post("/:contestId/vote", auth, async (req, res) => {
       });
     }
 
+    // Create vote without requiring authentication
     await Vote.create({
       contestId,
       contestantId,
@@ -421,6 +425,7 @@ router.post("/:contestId/vote", auth, async (req, res) => {
     });
   }
 });
+
 
 
 router.get("/:contestId/winners", async (req, res) => {
