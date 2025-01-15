@@ -105,28 +105,32 @@ router.post("/", auth, upload.single('coverPhoto'), async (req, res) => {
 });
 
 
-router.get("/all", async (req, res) => {
+router.get("/all", auth, async (req, res) => {
   try {
-    const contests = await Contest.find()
-      .populate('contestants')
+    const userId = req.user._id;
+
+    const contests = await Contest.find({ userId })
+      .populate('contestants') 
       .sort({ createdAt: -1 });
-    
+
     const processedContests = await Promise.all(
       contests.map(contest => calculateWinners(contest))
     );
-      
+
     res.json({
       success: true,
       data: processedContests,
     });
   } catch (error) {
-    console.error("Error fetching all contests:", error);
+    console.error("Error fetching user contests:", error);
     res.status(500).json({
       success: false,
       error: "Error fetching contests",
     });
   }
 });
+
+
 
 
 
@@ -383,7 +387,6 @@ router.post("/:contestId/vote", async (req, res) => {
       });
     }
 
-    // Create vote without requiring authentication
     await Vote.create({
       contestId,
       contestantId,
@@ -422,6 +425,43 @@ router.post("/:contestId/vote", async (req, res) => {
     res.status(500).json({
       success: false,
       error: "Failed to process vote"
+    });
+  }
+});
+
+router.delete("/:contestId", auth, async (req, res) => {
+  try {
+    const { contestId } = req.params;
+
+    const contest = await Contest.findById(contestId);
+    if (!contest) {
+      return res.status(404).json({ 
+        success: false, 
+        error: "Contest not found" 
+      });
+    }
+
+    if (contest.userId.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ 
+        success: false, 
+        error: "You do not have permission to delete this contest" 
+      });
+    }
+
+    await Contestant.deleteMany({ contestId });
+    await Vote.deleteMany({ contestId });
+
+    await Contest.findByIdAndDelete(contestId);
+
+    res.status(200).json({ 
+      success: true, 
+      message: "Contest deleted successfully" 
+    });
+  } catch (error) {
+    console.error("Error deleting contest:", error);
+    res.status(500).json({ 
+      success: false, 
+      error: "Failed to delete contest" 
     });
   }
 });
