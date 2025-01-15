@@ -74,7 +74,7 @@ router.post("/register", registerValidator, async (req, res) => {
 
     await user.save();
 
-    const verificationUrl = `http://localhost:5173/verify-email/${verificationToken}`;
+    const verificationUrl = `https://vothub.vercel.app/verify-email/${verificationToken}`;
 
     await transporter.sendMail({
       to: user.email,
@@ -113,7 +113,7 @@ router.post("/resend-verification-code", async (req, res) => {
     user.verificationTokenExpires = verificationTokenExpires;
     await user.save();
 
-    const verificationUrl = `http://localhost:5173/verify-email/${verificationToken}`;
+    const verificationUrl = `https://vothub.vercel.app/verify-email/${verificationToken}`;
 
     await transporter.sendMail({
       to: user.email,
