@@ -25,6 +25,37 @@ const storage = multer.diskStorage({
 
 const upload = multer({ storage });
 
+const calculateWinners = async (contest) => {
+  const now = new Date();
+  const endDate = new Date(contest.endDate);
+  
+  if (endDate < now && contest.contestants?.length > 0) {
+    const maxVotes = Math.max(...contest.contestants.map(c => c.votes || 0));
+    
+    const winnerIds = contest.contestants
+      .filter(c => (c.votes || 0) === maxVotes)
+      .map(c => c._id);
+    
+    await Contestant.updateMany(
+      { contestId: contest._id },
+      { isWinner: false }
+    );
+    
+    await Contestant.updateMany(
+      { 
+        contestId: contest._id,
+        _id: { $in: winnerIds }
+      },
+      { isWinner: true }
+    );
+    
+    contest.hasEnded = true;
+    await contest.save();
+  }
+  
+  return contest;
+};
+
 router.post("/", auth, upload.single('coverPhoto'), async (req, res) => {
   try {
     console.log("Request body:", req.body);
@@ -79,10 +110,14 @@ router.get("/all", async (req, res) => {
     const contests = await Contest.find()
       .populate('contestants')
       .sort({ createdAt: -1 });
+    
+    const processedContests = await Promise.all(
+      contests.map(contest => calculateWinners(contest))
+    );
       
     res.json({
       success: true,
-      data: contests,
+      data: processedContests,
     });
   } catch (error) {
     console.error("Error fetching all contests:", error);
@@ -296,10 +331,10 @@ router.get("/:contestId/contestants", async (req, res) => {
 
 
 
-router.post("/:contestId/vote", async (req, res) => {
+router.post("/:contestId/vote", auth, async (req, res) => {
   const { contestId } = req.params;
   const { contestantId } = req.body;
-  const voterId = req.ip; 
+  const voterId = req.user._id;
 
   try {
     if (!mongoose.Types.ObjectId.isValid(contestId) || 
@@ -323,28 +358,33 @@ router.post("/:contestId/vote", async (req, res) => {
       });
     }
 
-    if (!contest.isActive()) {
+    const now = new Date();
+    const endDate = new Date(contest.endDate);
+    if (endDate < now) {
       return res.status(400).json({
         success: false,
-        error: "Contest is not active"
+        error: "Contest has ended"
       });
     }
 
-    try {
-      await Vote.create({
-        contestId,
-        contestantId,
-        voterId
+    const existingVote = await Vote.findOne({
+      contestId,
+      contestantId,
+      voterId
+    });
+
+    if (existingVote) {
+      return res.status(400).json({
+        success: false,
+        error: "You have already voted for this contestant"
       });
-    } catch (error) {
-      if (error.code === 11000) { 
-        return res.status(400).json({
-          success: false,
-          error: "You have already voted for this contestant"
-        });
-      }
-      throw error;
     }
+
+    await Vote.create({
+      contestId,
+      contestantId,
+      voterId
+    });
 
     const updatedContestant = await Contestant.findOneAndUpdate(
       {
@@ -363,10 +403,14 @@ router.post("/:contestId/vote", async (req, res) => {
       });
     }
 
+    const updatedContest = await Contest.findById(contestId)
+      .populate('contestants');
+    
     res.json({
       success: true,
       message: "Vote recorded successfully",
-      currentVotes: updatedContestant.votes
+      currentVotes: updatedContestant.votes,
+      contest: updatedContest
     });
 
   } catch (error) {
@@ -378,6 +422,36 @@ router.post("/:contestId/vote", async (req, res) => {
   }
 });
 
+
+router.get("/:contestId/winners", async (req, res) => {
+  try {
+    const contest = await Contest.findById(req.params.contestId)
+      .populate('contestants');
+    
+    if (!contest) {
+      return res.status(404).json({
+        success: false,
+        error: "Contest not found"
+      });
+    }
+
+    const winners = contest.contestants.filter(c => c.isWinner);
+    
+    res.json({
+      success: true,
+      data: {
+        hasEnded: new Date(contest.endDate) < new Date(),
+        winners
+      }
+    });
+  } catch (error) {
+    console.error("Error fetching winners:", error);
+    res.status(500).json({
+      success: false,
+      error: "Failed to fetch winners"
+    });
+  }
+});
 
 
 

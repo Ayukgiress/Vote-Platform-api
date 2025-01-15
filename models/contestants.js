@@ -6,22 +6,23 @@ const contestantSchema = new mongoose.Schema({
     required: true
   },
   photoUrl: {
-    type: String,
-    required: true
+    type: String
+  },
+  votes: {
+    type: Number,
+    default: 0
   },
   contestId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Contest',
     required: true
   },
-  votes: {
-    type: Number,
-    default: 0
-  },
-  createdAt: {
-    type: Date,
-    default: Date.now
+  isWinner: {
+    type: Boolean,
+    default: false
   }
+}, {
+  timestamps: true
 });
 
 contestantSchema.methods.getVoteCount = async function() {
