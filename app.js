@@ -32,7 +32,7 @@ app.use(cookieParser());
 app.use(express.static(path.join(path.resolve(), 'public')));
 
 app.use(cors({
-  origin: 'https://vothub.vercel.app', 
+  origin: '*', 
   methods: ['GET', 'POST', "DELETE", "PUT", "PATCH"],
   credentials: true
 }));
