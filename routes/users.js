@@ -231,14 +231,29 @@ router.post("/refresh-token", async (req, res) => {
 
 router.get("/current-user", auth, async (req, res) => {
   try {
-    const user = await User.findById(req.user.id).select("-password").lean();
+    console.log("Current user request received", req.user._id);
+    
+    const user = await User.findById(req.user._id).select('-password');
+    
     if (!user) {
-      return res.status(404).json({ error: "User not found" });
+      return res.status(404).json({
+        success: false,
+        error: "User not found"
+      });
     }
-    return res.status(200).json(user);
+
+    console.log("Sending user data:", user);
+    
+    res.json({
+      success: true,
+      data: user
+    });
   } catch (error) {
     console.error("Error fetching current user:", error);
-    return res.status(500).json({ error: "Internal server error" });
+    res.status(500).json({
+      success: false,
+      error: "Error fetching user data"
+    });
   }
 });
 
