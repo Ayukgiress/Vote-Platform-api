@@ -93,6 +93,44 @@ router.post("/register", registerValidator, async (req, res) => {
   }
 });
 
+router.post('/verify-email/:token', async (req, res) => {
+  try {
+    const { token } = req.params;
+
+    const user = await User.findOne({
+      verificationToken: token,
+      verificationTokenExpires: { $gt: Date.now() },
+    });
+
+    if (!user) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid or expired verification token.',
+      });
+    }
+
+    user.isVerified = true;
+    user.verificationToken = undefined;
+    user.verificationTokenExpires = undefined;
+    await user.save();
+
+    const payload = { user: { id: user.id } };
+    const jwtToken = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '7d' });
+
+    res.status(200).json({
+      success: true,
+      message: 'Email verified successfully!',
+      token: jwtToken,
+    });
+  } catch (error) {
+    console.error('Verification error:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message || 'An error occurred during verification.',
+    });
+  }
+});
+
 
 router.post("/resend-verification-code", async (req, res) => {
   const { email } = req.body;
