@@ -18,6 +18,8 @@ if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir, { recursive: true });
 }
 
+const app = express();
+
 app.use('/uploads', express.static(uploadsDir));
 
 dotenv.config();   
@@ -47,7 +49,7 @@ import contestRouter from './routes/contests.js';
 
 app.use('/users', usersRouter); 
 app.use('/contests', contestRouter);
-// app.use('./vote',  voteRoute)
+// app.use('./vote', voteRoute)
 
 connectDB();
 
