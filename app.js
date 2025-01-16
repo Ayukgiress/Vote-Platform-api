@@ -7,18 +7,18 @@ import connectDB from './config/dbConfig.js';
 import cors from 'cors';  
 import dotenv from 'dotenv';
 import fs from 'fs';
+import { fileURLToPath } from 'url';
 
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
-const __dirname = path.dirname(new URL(import.meta.url).pathname);
+const uploadsDir = path.join(__dirname, 'uploads');
 
-const app = express();
-
-const uploadsDir = path.join(process.cwd(), 'uploads');
 if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir, { recursive: true });
 }
 
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+app.use('/uploads', express.static(uploadsDir));
 
 dotenv.config();   
 
