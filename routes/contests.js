@@ -79,11 +79,13 @@ router.post("/", auth, upload.single('coverPhoto'), async (req, res) => {
       });
     }
 
+    const fullImageUrl = `${process.env.BASE_URL || API_URL}/${req.file.path}`;
+    
     const contest = new Contest({
       userId,
       name,
       description,
-      coverPhotoUrl: req.file.path,
+      coverPhotoUrl: fullImageUrl,
       startDate,
       endDate,
       contestants: []
