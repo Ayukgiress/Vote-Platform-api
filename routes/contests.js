@@ -1,29 +1,19 @@
 import express from "express";
 const router = express.Router();
 import Contest from "../models/contest.js";
-import multer from "multer";
+
 import Contestant from "../models/contestants.js";
 import uploadMiddleware from "../middleware/upload.js";
-import path from "path";
 import auth from "../middleware/auth.js";
 import Vote from "../models/vote.js";
+import Notification from "../models/notification.js";
 import mongoose from "mongoose";
+import path from "path";
 
 const contestUpload = uploadMiddleware.fields([
   { name: "coverPhoto", maxCount: 1 },
   { name: "contestants", maxCount: 10 },
 ]);
-
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, "uploads/");
-  },
-  filename: (req, file, cb) => {
-    cb(null, Date.now() + path.extname(file.originalname));
-  },
-});
-
-const upload = multer({ storage });
 
 const calculateWinners = async (contest) => {
   const now = new Date();
@@ -56,7 +46,7 @@ const calculateWinners = async (contest) => {
   return contest;
 };
 
-router.post("/", auth, upload.single('coverPhoto'), async (req, res) => {
+router.post("/", auth, uploadMiddleware.single('coverPhoto'), async (req, res) => {
   try {
     console.log("Request body:", req.body);
     console.log("File:", req.file);
@@ -83,7 +73,7 @@ router.post("/", auth, upload.single('coverPhoto'), async (req, res) => {
       userId,
       name,
       description,
-      coverPhotoUrl: req.file.path,
+      coverPhotoUrl: '/uploads/' + req.file.filename,
       startDate,
       endDate,
       contestants: []
@@ -134,7 +124,7 @@ router.get("/all", auth, async (req, res) => {
 
 
 
-router.post("/:contestId/contestants", contestUpload, async (req, res) => {
+router.post("/:contestId/contestants", auth, contestUpload, async (req, res) => {
   try {
     const { contestId } = req.params;
     const { contestants } = req.body;
@@ -158,7 +148,7 @@ router.post("/:contestId/contestants", contestUpload, async (req, res) => {
 
     const contestantsWithPhotos = contestants.map((contestant, index) => ({
       name: contestant,
-      photoUrl: contestantPhotos[index] ? contestantPhotos[index].path : "",
+      photoUrl: contestantPhotos[index] ? '/uploads/' + contestantPhotos[index].filename : "",
       contestId: contestId
     }));
 

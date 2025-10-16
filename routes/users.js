@@ -6,7 +6,7 @@ import registerValidator from "../utils/registerValidator.js";
 import loginValidator from "../utils/loginValidator.js";
 import auth from "../middleware/auth.js";
 import { uploadToCloudService } from "../CloudService.js";
-import multer from "multer";
+import uploadMiddleware from "../middleware/upload.js";
 import crypto from "crypto";
 import bcrypt from "bcryptjs";
 import nodemailer from "nodemailer";
@@ -23,34 +23,7 @@ const transporter = nodemailer.createTransport({
   },
 });
 
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, "uploads/");
-  },
-  filename: (req, file, cb) => {
-    cb(null, Date.now() + "-" + file.originalname);
-  },
-});
-
-const fileFilter = (req, file, cb) => {
-  const allowedTypes = ["image/jpeg", "image/png", "image/gif"];
-  if (allowedTypes.includes(file.mimetype)) {
-    cb(null, true);
-  } else {
-    cb(
-      new Error(
-        "Invalid file type. Only JPEG, PNG, and GIF files are allowed."
-      ),
-      false
-    );
-  }
-};
-
-const upload = multer({
-  storage,
-  limits: { fileSize: 5 * 1024 * 1024 },
-  fileFilter,
-});
+const profileImageUpload = uploadMiddleware.single("file");
 
 router.post("/register", registerValidator, async (req, res) => {
   const { username, email, password } = req.body;
@@ -318,33 +291,37 @@ router.get("/profile", auth, async (req, res) => {
 router.post(
   "/uploadProfileImage",
   auth,
-  upload.single("file"),
-  async (req, res, next) => {
-    try {
-      if (!req.file) {
-        return res.status(400).json({ message: "No file uploaded." });
+  (req, res, next) => {
+    profileImageUpload(req, res, async (err) => {
+      if (err) {
+        return next(err);
       }
+      try {
+        if (!req.file) {
+          return res.status(400).json({ message: "No file uploaded." });
+        }
 
-      const filePath = req.file.path;
-      const result = await uploadToCloudService(filePath);
+        const filePath = req.file.path;
+        const result = await uploadToCloudService(filePath);
 
-      if (!req.user) {
-        return res.status(400).json({ message: "User not found." });
+        if (!req.user) {
+          return res.status(400).json({ message: "User not found." });
+        }
+
+        const user = await User.findById(req.user.id);
+        if (!user) {
+          return res.status(404).json({ message: "User not found" });
+        }
+
+        user.profileImage = result.secure_url;
+        await user.save();
+
+        res.json({ url: user.profileImage });
+      } catch (error) {
+        console.error("Error uploading profile image:", error);
+        next(error);
       }
-
-      const user = await User.findById(req.user.id);
-      if (!user) {
-        return res.status(404).json({ message: "User not found" });
-      }
-
-      user.profileImage = result.secure_url;
-      await user.save();
-
-      res.json({ url: user.profileImage });
-    } catch (error) {
-      console.error("Error uploading profile image:", error);
-      next(error);
-    }
+    });
   }
 );
 

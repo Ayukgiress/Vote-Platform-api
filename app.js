@@ -6,21 +6,10 @@ import logger from 'morgan';
 import connectDB from './config/dbConfig.js';
 import cors from 'cors';  
 import dotenv from 'dotenv';
-import fs from 'fs';
-import { fileURLToPath } from 'url';
-
-// const __filename = fileURLToPath(import.meta.url);
-// const __dirname = path.dirname(__filename);
-
-// const uploadsDir = path.join(__dirname, 'uploads');
-
-// if (!fs.existsSync(uploadsDir)) {
-//   fs.mkdirSync(uploadsDir, { recursive: true });
-// }
 
 const app = express();
 
-app.use('/uploads', express.static('uploads'));
+app.use('/uploads', express.static(path.join(path.resolve(), 'uploads')));
 
 
 
