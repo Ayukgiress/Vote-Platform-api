@@ -329,9 +329,24 @@ router.get("/:contestId/contestants", async (req, res) => {
 
 router.post("/:contestId/vote", async (req, res) => {
   const { contestId } = req.params;
-  const { contestantId } = req.body;
+  const { contestantId, ip } = req.body;
 
-  const voterId = req.ip 
+  let voterId;
+
+  if (ip) {
+    // Validate provided IP address
+    const ipRegex = /^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$|^([0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}$|^::1$|^::$/;
+    if (!ipRegex.test(ip)) {
+      return res.status(400).json({
+        success: false,
+        error: "Invalid IP address provided"
+      });
+    }
+    voterId = ip;
+  } else {
+    // Fallback to req.ip if no IP provided
+    voterId = req.ip;
+  }
 
   try {
     if (!mongoose.Types.ObjectId.isValid(contestId) || 
