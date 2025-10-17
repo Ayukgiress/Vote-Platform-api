@@ -9,6 +9,8 @@ import dotenv from 'dotenv';
 
 const app = express();
 
+app.set('trust proxy', true);
+
 app.use('/uploads', express.static(path.join(path.resolve(), 'uploads')));
 
 
