@@ -6,12 +6,14 @@ import logger from 'morgan';
 import connectDB from './config/dbConfig.js';
 import cors from 'cors';  
 import dotenv from 'dotenv';
+import { fileURLToPath } from 'url';
 
 const app = express();
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 app.set('trust proxy', true);
 
-app.use('/uploads', express.static(path.join(path.resolve(), 'uploads')));
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 
 
@@ -24,7 +26,7 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 app.use(cookieParser());
 
-app.use(express.static(path.join(path.resolve(), 'public')));
+app.use(express.static(path.join(__dirname, 'public')));
 
 app.use(cors({
   origin: '*', 

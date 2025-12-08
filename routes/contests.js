@@ -51,7 +51,7 @@ router.post("/", auth, uploadMiddleware.single('coverPhoto'), async (req, res) =
     console.log("Request body:", req.body);
     console.log("File:", req.file);
 
-    const { name, description, startDate, endDate } = req.body;
+    const { name, description, category, startDate, endDate } = req.body;
     const userId = req.user._id; 
 
     if (!name || !description || !startDate || !endDate) {
@@ -73,6 +73,7 @@ router.post("/", auth, uploadMiddleware.single('coverPhoto'), async (req, res) =
       userId,
       name,
       description,
+      category,
       coverPhotoUrl: '/uploads/' + req.file.filename,
       startDate,
       endDate,
