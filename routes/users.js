@@ -143,18 +143,35 @@ router.post("/resend-verification-code", async (req, res) => {
 
 router.post("/login", loginValidator, async (req, res, next) => {
   const { email, password } = req.body;
+  const startTime = Date.now();
 
   try {
+    console.log(`Login attempt for email: ${email}`);
+
+    // Measure database query time
+    const dbStart = Date.now();
     const user = await User.findOne({ email });
+    const dbEnd = Date.now();
+    console.log(`Database query took: ${dbEnd - dbStart}ms`);
+
     if (!user) {
+      console.log(`Login failed: User not found for email ${email}`);
       return res.status(400).json({ msg: "Invalid email or password" });
     }
 
+    // Measure password verification time
+    const pwStart = Date.now();
     const isMatch = await user.matchPassword(password);
+    const pwEnd = Date.now();
+    console.log(`Password verification took: ${pwEnd - pwStart}ms`);
+
     if (!isMatch) {
+      console.log(`Login failed: Invalid password for email ${email}`);
       return res.status(400).json({ msg: "Invalid email or password" });
     }
 
+    // Measure token generation time
+    const tokenStart = Date.now();
     const payload = { user: { id: user.id } };
     const accessToken = jwt.sign(payload, process.env.JWT_SECRET, {
       expiresIn: "7d",
@@ -162,9 +179,18 @@ router.post("/login", loginValidator, async (req, res, next) => {
     const refreshToken = jwt.sign(payload, process.env.JWT_SECRET, {
       expiresIn: "7d",
     });
+    const tokenEnd = Date.now();
+    console.log(`Token generation took: ${tokenEnd - tokenStart}ms`);
 
+    // Measure database save time
+    const saveStart = Date.now();
     user.refreshToken = refreshToken;
     await user.save();
+    const saveEnd = Date.now();
+    console.log(`Database save took: ${saveEnd - saveStart}ms`);
+
+    const totalTime = Date.now() - startTime;
+    console.log(`Total login time: ${totalTime}ms`);
 
     res.json({ accessToken, refreshToken });
   } catch (err) {

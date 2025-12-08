@@ -70,7 +70,7 @@ UserSchema.methods.matchPassword = async function(enteredPassword) {
 UserSchema.methods.generateResetPasswordToken = function() {
   const resetToken = crypto.randomBytes(20).toString('hex');
   this.resetPasswordToken = resetToken;
-  this.resetPasswordExpires = Date.now() + 3600000; 
+  this.resetPasswordExpires = Date.now() + 3600000;
   return resetToken;
 };
 
