@@ -14,6 +14,10 @@ const contestSchema = new mongoose.Schema({
     type: String,
     required: true
   },
+  category: {
+    type: String,
+    required: false
+  },
   coverPhotoUrl: {
     type: String,
     required: true
